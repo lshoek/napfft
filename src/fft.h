@@ -5,48 +5,44 @@
 #include <nap/numeric.h>
 #include <complex>
 
+#include <kiss_fft.h>
+
 namespace nap
 {
-	// Forward declares
-	template <typename T>
-	class KissFFTState;
-
 	/**
 	 * FFTBuffer
 	 */
-	class NAPAPI FFTBuffer : public Resource
+	class NAPAPI FFTBuffer
 	{
-		RTTI_ENABLE(Resource)
+		RTTI_ENABLE()
 	public:
-		virtual ~FFTBuffer() {};
-		uint mRequestedFFTSize = 1024U;
-	};
-
-
-	template <typename T>
-	class NAPAPI TypedFFTBuffer : public FFTBuffer
-	{
-		RTTI_ENABLE(FFTBuffer)
-	public:
-		TypedFFTBuffer();
-		virtual ~TypedFFTBuffer() {}
+		FFTBuffer(uint dataSize);
+		virtual ~FFTBuffer() {}
 
 		/**
-		* Initialize this object after de-serialization
-		* @param errorState contains the error message when initialization fails
-		*/
-		virtual bool init(utility::ErrorState& errorState) override;
-
-		/**
-		 * 
+		 *
 		 */
-		bool fft(const std::vector<T>& sampleBuffer, std::vector<std::complex<T>>& outBuffer, utility::ErrorState& errorState);
+		void supplySamples(const std::vector<float>& samples);
 
-		std::unique_ptr<KissFFTState<T>> mFFTState;
+		/**
+		 *
+		 */
+		const std::vector<std::complex<float>>& getFFT()		{ return mFFTBuffer; }
+
+		/**
+		 *
+		 */
+		bool isDirty() const									{ return mDirty; }
+
+	private:
+		uint mDataSize;
+		uint mBinCount;
+
+		std::unique_ptr<kiss_fft_cfg> mFFTConfig;
+		std::unique_ptr<kiss_fft_cfg> mInverseFFTConfig;
+
+		std::vector<float> mSampleBuffer;
+		std::vector<std::complex<float>> mFFTBuffer;
+		bool mDirty = false;
 	};
-
-	using FFTBufferFloat = TypedFFTBuffer<float>;
-	using FFTBufferDouble = TypedFFTBuffer<double>;
-	using FFTBufferInt = TypedFFTBuffer<int>;
-	using FFTBufferShort = TypedFFTBuffer<int16>;
 }

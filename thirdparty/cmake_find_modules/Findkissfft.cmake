@@ -1,16 +1,18 @@
-if(WIN32)
-
 find_path(KISSFFT_DIR
-    NAMES source/kiss_fft.h
+    NAMES src/kiss_fft.h
     HINTS ${NAP_ROOT}/modules/napfft/thirdparty/kissfft
 )
 
 mark_as_advanced(KISSFFT_DIR)
-set(KISSFFT_INCLUDE_DIR ${KISSFFT_DIR}/source)
+set(KISSFFT_INCLUDE_DIR ${KISSFFT_DIR}/src)
 file(GLOB KISSFFT_LICENSE_FILES ${KISSFFT_DIR}/LICENSES/*)
 
-
-endif()
+find_library(
+    KISSFFT_LIB
+    NAMES kissfft-float
+    PATHS ${KISSFFT_DIR}/msvc/${ARCH}/bin
+    NO_DEFAULT_PATH
+)
 
 # promote package for find
 include(FindPackageHandleStandardArgs)
