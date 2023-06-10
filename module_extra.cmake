@@ -12,7 +12,7 @@ if(NAP_BUILD_CONTEXT MATCHES "source")
     if(WIN32)
         target_compile_definitions(${PROJECT_NAME} PUBLIC WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
 
-        # Copy FFmpeg DLLs to build directory
+        # Copy kissfft DLLs to build directory
         file(GLOB KISSFFT_DLLS ${dest_dir}/${NAP_THIRDPARTY_PLATFORM_DIR}/${ARCH}/bin/*.dll)
         copy_files_to_bin(${KISSFFT_DLLS})
     endif()
@@ -22,7 +22,6 @@ if(NAP_BUILD_CONTEXT MATCHES "source")
     install(DIRECTORY ${KISSFFT_INCLUDE_DIR} DESTINATION ${dest_dir})
 else()
     add_include_to_interface_target(napfft ${KISSFFT_INCLUDE_DIR})
-    add_define_to_interface_target(napfft KISSFFT_TOOLS=OFF)
 
     if(WIN32)
         # Define _WIN32_WINNT for KISSFFT

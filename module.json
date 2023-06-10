@@ -6,6 +6,6 @@
         "napscene"
     ],
     "WindowsDllSearchPaths": [
-        "{ROOT}/modules/napfft/thirdparty/kissfft/msvc/{BUILD_ARCH}/{BUILD_TYPE}"
+        "{ROOT}/modules/napfft/thirdparty/kissfft/msvc/{BUILD_ARCH}/bin"
     ]
 }
