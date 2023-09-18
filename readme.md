@@ -2,7 +2,7 @@
 
 Module that wraps [Kiss FFT](https://github.com/mborgerding/kissfft) functionality for NAP 0.6. Contributions are welcome!
 
-- Implements real-optimized FFTs (positive half-spectrum: (nfft/2+1) complex frequency bins)
+- Implements real-optimized FFTs (positive half-spectrum: `nfft/2+1` complex frequency bins)
 - Currently supports Windows only
 
 ## Example
