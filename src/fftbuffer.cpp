@@ -9,6 +9,7 @@
 #include <mathutils.h>
 #include <glm/gtc/constants.hpp>
 #include <nap/assert.h>
+#include <nap/logger.h>
 
 // External includes
 #include <kiss_fftr.h>
@@ -80,12 +81,12 @@ namespace nap
 		mForwardHammingWindow.resize(data_size);
 		for (uint i = 0; i < data_size; ++i)
 		{
-			mForwardHammingWindow[i] = i * (0.54f - 0.46f * std::cos(2.0f * glm::pi<float>() * i / data_size));
+			mForwardHammingWindow[i] = 0.54f - 0.46f * std::cos(2.0f * glm::pi<float>() * (i / static_cast<float>(data_size)));
 			mHammingWindowSum += mForwardHammingWindow[i];
 		}
+		mNormalizationFactor = 2.0f / mHammingWindowSum;
 
 		// Bins
-		mScaling = 1.0f / static_cast<float>(data_size);
 		mBinCount = data_size / 2 + 1;
 
 		// Create FFT buffers
@@ -138,24 +139,41 @@ namespace nap
 				for (int32_t i = 0; i < data_size; ++i)
 					mSampleBufferWindowed[i] = mSampleBuffer[i] * mForwardHammingWindow[i];
 
+				// Scales amplitudes by nfft/2
 				kiss_fftr(mContext->mForwardConfig, static_cast<const float*>(mSampleBufferWindowed.data()), reinterpret_cast<kiss_fft_cpx*>(mComplexOut.data()));
 			}
-
-			// TODO: Apply specified filter (low pass, high pass) w/ (min freq, max freq)
 
 			// Compute amplitudes and phase angles
 			for (uint i = 0; i < mBinCount; i++)
 			{
-				auto cpx_norm = mComplexOut[i] * mScaling;
-				mAmplitude[i] = std::abs(cpx_norm);
-				mPhase[i] = std::arg(cpx_norm);
+				const auto& cpx = mComplexOut[i];
+				mAmplitude[i] = std::abs(cpx) * mNormalizationFactor;
+				mPhase[i] = std::arg(cpx);
 			}
 			mDirty = false;
 		}
 	}
 
 
-	uint FFTBuffer::getDataSize() const
+	const std::vector<float>& FFTBuffer::getAmplitudes()
+	{
+		if (mDirty)
+			transform();
+
+		return mAmplitude;
+	}
+
+
+	const std::vector<float>& FFTBuffer::getPhases()
+	{
+		if (mDirty)
+			transform();
+
+		return mPhase;
+	}
+
+
+	uint FFTBuffer::getDataSize()
 	{
 		return mContext->getSize();
 	}

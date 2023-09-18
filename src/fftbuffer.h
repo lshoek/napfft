@@ -24,34 +24,34 @@ namespace nap
 		~FFTBuffer();
 
 		/**
-		 * TODO: Make thread-safe
+		 * Update the internal sample buffer to perform FFT on. This funtion is thread-safe.
 		 */
 		void supply(const std::vector<float>& samples);
 
 		/**
-		 * Call on main thread
+		 * Performs FFT and updates amplitudes and phases. This funtion is thread-safe.
 		 */
 		void transform();
 
 		/**
-		 *
+		 * @return the number of FFT bins
 		 */
-		uint getBinCount() const								{ return mBinCount; }
+		uint getBinCount() const { return mBinCount; }
 
 		/**
-		 *
+		 * @return the number of sample buffer data elements
 		 */
-		uint getDataSize() const;
+		uint getDataSize();
 
 		/**
 		 * @return normalized magnitudes (rho)
 		 */
-		const std::vector<float>& getAmplitude() const { return mAmplitude; }
+		const std::vector<float>& getAmplitudes();
 
 		/**
 		 * @return normalized phase angles (theta)
 		 */
-		const std::vector<float>& getPhase() const { return mPhase; }
+		const std::vector<float>& getPhases();
 
 	private:
 		class KissContext;
@@ -63,7 +63,8 @@ namespace nap
 		std::vector<float> mPhase;						//< phase angle (theta)
 
 		std::vector<float> mForwardHammingWindow;		//< preprocess samples for fft window
-		float mHammingWindowSum;
+		float mHammingWindowSum = 0.0f;
+		float mNormalizationFactor;
 
 		// The sample buffer is accessed on both the audio and main thread. Use mutex for read/write.
 		std::vector<float> mSampleBuffer;
@@ -72,7 +73,6 @@ namespace nap
 		std::vector<float> mSampleBufferWindowed;
 
 		uint mBinCount;
-		float mScaling = 1.0f;
 		bool mDirty = false;
 	};
 }
