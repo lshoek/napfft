@@ -14,6 +14,16 @@
 // External includes
 #include <kiss_fftr.h>
 
+// Overlap enum
+RTTI_BEGIN_ENUM(nap::FFTBuffer::EOverlap)
+	RTTI_ENUM_VALUE(nap::FFTBuffer::EOverlap::One,		"One"),
+	RTTI_ENUM_VALUE(nap::FFTBuffer::EOverlap::Three,	"Three"),
+	RTTI_ENUM_VALUE(nap::FFTBuffer::EOverlap::Five,		"Five"),
+	RTTI_ENUM_VALUE(nap::FFTBuffer::EOverlap::Seven,	"Seven"),
+	RTTI_ENUM_VALUE(nap::FFTBuffer::EOverlap::Nine,		"Nine"),
+	RTTI_ENUM_VALUE(nap::FFTBuffer::EOverlap::Eleven,	"Eleven")
+RTTI_END_ENUM
+
 // nap::FFTBuffer run time class definition 
 RTTI_BEGIN_CLASS_NO_DEFAULT_CONSTRUCTOR(nap::FFTBuffer)
 	RTTI_CONSTRUCTOR(nap::uint)
@@ -67,15 +77,23 @@ namespace nap
 	// FFT Buffer
 	//////////////////////////////////////////////////////////////////////////
 
-	FFTBuffer::FFTBuffer(uint dataSize)
+	FFTBuffer::FFTBuffer(uint dataSize, EOverlap overlap)
 	{
 		// Create kiss context
 		mContext = std::unique_ptr<FFTBuffer::KissContext, FFTBuffer::KissContextDeleter>(new FFTBuffer::KissContext(dataSize));
 		const uint data_size = mContext->getSize();
 
+		// Compute hop size
+		mOverlap = overlap;
+		mHopSize = data_size / static_cast<uint>(mOverlap);
+
+		// Data size required to perform sliding DFT
+		uint full_buffer_size = (mHopSize > 1) ? data_size * 2 : data_size;;
+
 		// Create sample buffer
-		mSampleBuffer.resize(data_size);
+		mSampleBuffer.resize(data_size * 2);
 		mSampleBufferWindowed.resize(data_size);
+		mSampleBufferHalfPtr = mSampleBuffer.data() + mSampleBuffer.size() / 2;
 
 		// Compute hamming window
 		mForwardHammingWindow.resize(data_size);
@@ -91,6 +109,7 @@ namespace nap
 
 		// Create FFT buffers
 		mComplexOut.resize(mBinCount);
+		mComplexOutAverage.resize(mBinCount);
 		mAmplitude.resize(mBinCount);
 		mPhase.resize(mBinCount);
 	}
@@ -100,18 +119,25 @@ namespace nap
 
 	void FFTBuffer::supply(const std::vector<float>& samples)
 	{
+		const uint data_size = mContext->getSize();
+		const uint data_bytes = data_size * sizeof(float);
+
 		{
 			std::lock_guard<std::mutex> lock(mSampleBufferMutex);
 
-			if (samples.size() == mSampleBuffer.size())
+			// Copy second half to first half
+			std::memcpy(mSampleBuffer.data(), mSampleBufferHalfPtr, data_bytes);
+
+			// Copy new samples to second half
+			if (samples.size() == data_size)
 			{
-				mSampleBuffer = samples;
+				std::memcpy(mSampleBufferHalfPtr, samples.data(), data_bytes);
 			}
-			else if (samples.size() > mSampleBuffer.size())
+			else if (samples.size() > data_size)
 			{
 				// Zero-padding
 				mSampleBuffer.clear();
-				std::memcpy(mSampleBuffer.data(), samples.data(), mSampleBuffer.size() * sizeof(float));
+				std::memcpy(mSampleBufferHalfPtr, samples.data(), data_bytes);
 			}
 			else
 			{
@@ -127,20 +153,40 @@ namespace nap
 	{
 		if (mDirty)
 		{
+			// Copy data to windowed array
+			const uint data_size = mContext->getSize();
+			const uint hop_count = static_cast<uint>(mOverlap);
+			std::fill(mComplexOutAverage.begin(), mComplexOutAverage.end(), 0.0f);
+
 			{
-				// Perform FFT
 				std::lock_guard<std::mutex> lock(mSampleBufferMutex);
 
-				// Copy data to windowed array
-				const uint data_size = mContext->getSize();
-				std::memcpy(mSampleBufferWindowed.data(), mSampleBuffer.data(), sizeof(float) * data_size);
+				// Perform FFT
+				std::memcpy(mSampleBufferWindowed.data(), mSampleBufferHalfPtr, sizeof(float) * data_size);
 
-				// Apply hamming window
-				for (int32_t i = 0; i < data_size; ++i)
-					mSampleBufferWindowed[i] = mSampleBuffer[i] * mForwardHammingWindow[i];
+				for (uint h = 0; h < hop_count; h++)
+				{
+					const uint start = (h+1) * mHopSize;
 
-				// Scales amplitudes by nfft/2
-				kiss_fftr(mContext->mForwardConfig, static_cast<const float*>(mSampleBufferWindowed.data()), reinterpret_cast<kiss_fft_cpx*>(mComplexOut.data()));
+					// Apply hamming window
+					for (uint i = 0; i < data_size; ++i)
+						mSampleBufferWindowed[i] = mSampleBuffer[start + i] * mForwardHammingWindow[i];
+
+					// Scales amplitudes by nfft/2
+					kiss_fftr(mContext->mForwardConfig, static_cast<const float*>(mSampleBufferWindowed.data()), reinterpret_cast<kiss_fft_cpx*>(mComplexOut.data()));
+
+					// Add complex out to average
+					for (uint i = 0; i < mComplexOut.size(); ++i)
+						mComplexOutAverage[i] += mComplexOut[i];
+				}
+			}
+
+			// Average windowed buffer
+			if (hop_count > 1)
+			{
+				const float divisor = 1.0f / static_cast<float>(hop_count);
+				for (auto& c : mComplexOutAverage)
+					c *= divisor;
 			}
 
 			// Compute amplitudes and phase angles
@@ -155,7 +201,7 @@ namespace nap
 	}
 
 
-	const std::vector<float>& FFTBuffer::getAmplitudes()
+	const std::vector<float>& FFTBuffer::getAmplitudeSpectrum()
 	{
 		if (mDirty)
 			transform();
@@ -164,7 +210,7 @@ namespace nap
 	}
 
 
-	const std::vector<float>& FFTBuffer::getPhases()
+	const std::vector<float>& FFTBuffer::getPhaseSpectrum()
 	{
 		if (mDirty)
 			transform();

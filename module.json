@@ -3,7 +3,8 @@
     "mID": "ModuleInfo",
     "RequiredModules": [
         "napmath",
-        "napscene"
+        "napscene",
+        "napparameter"
     ],
     "WindowsDllSearchPaths": [
         "{ROOT}/bin/{BUILD_ARCH}",

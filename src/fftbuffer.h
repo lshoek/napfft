@@ -19,8 +19,22 @@ namespace nap
 	{
 		RTTI_ENABLE()
 	public:
+		using AmplitudeSpectrum = std::vector<float>;
+		using PhaseSpectrum = std::vector<float>;
+
+		// Number of overlaps
+		enum EOverlap : uint
+		{
+			One		= 1,
+			Three	= 3,
+			Five	= 5,
+			Seven	= 7,
+			Nine	= 9,
+			Eleven	= 11
+		};
+
 		// Constructor
-		FFTBuffer(uint dataSize);
+		FFTBuffer(uint dataSize, EOverlap overlap = EOverlap::One);
 		~FFTBuffer();
 
 		/**
@@ -46,12 +60,12 @@ namespace nap
 		/**
 		 * @return normalized magnitudes (rho)
 		 */
-		const std::vector<float>& getAmplitudes();
+		const AmplitudeSpectrum& getAmplitudeSpectrum();
 
 		/**
 		 * @return normalized phase angles (theta)
 		 */
-		const std::vector<float>& getPhases();
+		const PhaseSpectrum& getPhaseSpectrum();
 
 	private:
 		class KissContext;
@@ -59,8 +73,10 @@ namespace nap
 		std::unique_ptr<KissContext, KissContextDeleter> mContext;
 
 		std::vector<std::complex<float>> mComplexOut;
-		std::vector<float> mAmplitude;					//< magnitude (rho)
-		std::vector<float> mPhase;						//< phase angle (theta)
+		std::vector<std::complex<float>> mComplexOutAverage;
+
+		AmplitudeSpectrum mAmplitude;					//< magnitude (rho)
+		PhaseSpectrum mPhase;							//< phase angle (theta)
 
 		std::vector<float> mForwardHammingWindow;		//< preprocess samples for fft window
 		float mHammingWindowSum = 0.0f;
@@ -68,11 +84,17 @@ namespace nap
 
 		// The sample buffer is accessed on both the audio and main thread. Use mutex for read/write.
 		std::vector<float> mSampleBuffer;
+		float* mSampleBufferHalfPtr = nullptr;
 		std::mutex mSampleBufferMutex;
 
 		std::vector<float> mSampleBufferWindowed;
 
 		uint mBinCount;
+		float mBinFrequency;
+
+		EOverlap mOverlap;
+		uint mHopSize;
+
 		bool mDirty = false;
 	};
 }
