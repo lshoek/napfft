@@ -4,7 +4,7 @@ endif()
 
 if(NAP_BUILD_CONTEXT MATCHES "source")
     target_include_directories(${PROJECT_NAME} PUBLIC src ${KISSFFT_INCLUDE_DIR})
-    target_link_libraries(${PROJECT_NAME} ${KISSFFT_LIB})
+    target_link_libraries(${PROJECT_NAME} ${KISSFFT_RELEASE_LIB})
 
     # additional definitions
     if(WIN32)
