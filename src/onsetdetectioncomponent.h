@@ -37,6 +37,7 @@ namespace nap
 			rtti::ObjectPtr<ParameterFloat> mThresholdDecay;
 			uint mMinBin = 0;
 			uint mMaxBin = 1;
+			float mMaxBPM = 160.0f;
 		};
 
 		// Constructor
@@ -64,13 +65,16 @@ namespace nap
 		{
 		public:
 			OnsetData(const OnsetDetectionComponent::FilterParameterItem& item) :
-				mParameter(item.mParameter.get()), mMultiplier(item.mMultiplier.get()), mThresholdDecay(item.mThresholdDecay.get()), mMinMaxBins({ item.mMinBin, item.mMaxBin }) {}
+				mParameter(item.mParameter.get()), mMultiplier(item.mMultiplier.get()), mThresholdDecay(item.mThresholdDecay.get()), mMinMaxBins({ item.mMinBin, item.mMaxBin }),
+				mMinInterval(std::max(60.0f/item.mMaxBPM, 0.0001f)) {}
 
 			ParameterFloat* mParameter = nullptr;
 			ParameterFloat* mMultiplier = nullptr;
 			ParameterFloat* mThresholdDecay = nullptr;
 			glm::uvec2 mMinMaxBins = { 0, 255 };
 			float mOnsetThreshold = 0.0f;
+			float mLastOnsetDetected = 0.0f;
+			float mMinInterval = 0.0001f;
 		};
 
 		// Constructor
@@ -98,5 +102,6 @@ namespace nap
 		std::vector<OnsetData> mOnsetList;
 
 		FFTBuffer::AmplitudeSpectrum mPreviousBuffer;
+		float mElapsedTime = 0.0f;
 	};
 }

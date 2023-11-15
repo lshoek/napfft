@@ -15,6 +15,7 @@ RTTI_BEGIN_CLASS(nap::OnsetDetectionComponent::FilterParameterItem)
 	RTTI_PROPERTY("ThresholdDecay", &nap::OnsetDetectionComponent::FilterParameterItem::mThresholdDecay, nap::rtti::EPropertyMetaData::Default)
 	RTTI_PROPERTY("MinimumBin", &nap::OnsetDetectionComponent::FilterParameterItem::mMinBin, nap::rtti::EPropertyMetaData::Default)
 	RTTI_PROPERTY("MaximumBin", &nap::OnsetDetectionComponent::FilterParameterItem::mMaxBin, nap::rtti::EPropertyMetaData::Default)
+	RTTI_PROPERTY("MaxBPM", &nap::OnsetDetectionComponent::FilterParameterItem::mMaxBPM, nap::rtti::EPropertyMetaData::Default)
 RTTI_END_CLASS
 
 RTTI_BEGIN_CLASS(nap::OnsetDetectionComponent)
@@ -67,17 +68,34 @@ namespace nap
 
 	void OnsetDetectionComponentInstance::update(double deltaTime)
 	{
-		const auto& amps = mFFTAudioComponent->getFFTBuffer().getAmplitudeSpectrum();
-		for (const auto& entry : mOnsetList)
-		{
-			float mult = (entry.mMultiplier != nullptr) ? entry.mMultiplier->mValue : 1.0f;
-			float decay = (entry.mThresholdDecay != nullptr) ? entry.mThresholdDecay->mValue : 0.0005f;
-			float value = std::min(entry.mParameter->mValue, 1.0f);
-			float value_inverse = 1.0f - value;
-			float decrement = std::abs(value_inverse - value_inverse * std::pow(decay, static_cast<float>(deltaTime)));
+		const float delta_time = static_cast<float>(deltaTime);
+		mElapsedTime += delta_time;
 
-			float flux = utility::flux(amps, mPreviousBuffer, entry.mMinMaxBins.x, entry.mMinMaxBins.y) * mult;
-			entry.mParameter->setValue(std::max<float>(value - decrement, flux));
+		// Fetch amplitudes
+		const auto& amps = mFFTAudioComponent->getFFTBuffer().getAmplitudeSpectrum();
+
+		for (auto& entry : mOnsetList)
+		{
+			float decay = (entry.mThresholdDecay != nullptr) ? entry.mThresholdDecay->mValue : 0.0005f;
+			float value_inverse = 1.0f - entry.mOnsetThreshold;
+			float decrement = std::abs(value_inverse - value_inverse * std::pow(decay, delta_time));
+			float threshold = std::max(entry.mOnsetThreshold - decrement, 0.0f);
+
+			bool onset = false;
+			if (mElapsedTime >= entry.mLastOnsetDetected + entry.mMinInterval)
+			{
+				float mult = (entry.mMultiplier != nullptr) ? entry.mMultiplier->mValue : 1.0f;
+				float flux = utility::flux(amps, mPreviousBuffer, entry.mMinMaxBins.x, entry.mMinMaxBins.y) * mult;
+
+				onset = flux > threshold;
+				entry.mLastOnsetDetected = onset ? mElapsedTime : entry.mLastOnsetDetected;
+				entry.mOnsetThreshold = onset ? flux : threshold;
+			}
+			else
+			{
+				entry.mOnsetThreshold = threshold;
+			}
+			entry.mParameter->setValue(entry.mOnsetThreshold * entry.mParameter->mMaximum);
 		}
 
 		// Copy
