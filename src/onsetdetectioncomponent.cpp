@@ -15,7 +15,7 @@ RTTI_BEGIN_CLASS(nap::OnsetDetectionComponent::FilterParameterItem)
 	RTTI_PROPERTY("ThresholdDecay", &nap::OnsetDetectionComponent::FilterParameterItem::mThresholdDecay, nap::rtti::EPropertyMetaData::Default)
 	RTTI_PROPERTY("MinimumBin", &nap::OnsetDetectionComponent::FilterParameterItem::mMinBin, nap::rtti::EPropertyMetaData::Default)
 	RTTI_PROPERTY("MaximumBin", &nap::OnsetDetectionComponent::FilterParameterItem::mMaxBin, nap::rtti::EPropertyMetaData::Default)
-	RTTI_PROPERTY("MaxBPM", &nap::OnsetDetectionComponent::FilterParameterItem::mMaxBPM, nap::rtti::EPropertyMetaData::Default)
+	RTTI_PROPERTY("SmoothTime", &nap::OnsetDetectionComponent::FilterParameterItem::mSmoothTime, nap::rtti::EPropertyMetaData::Default)
 RTTI_END_CLASS
 
 RTTI_BEGIN_CLASS(nap::OnsetDetectionComponent)
@@ -76,26 +76,18 @@ namespace nap
 
 		for (auto& entry : mOnsetList)
 		{
-			float decay = (entry.mThresholdDecay != nullptr) ? entry.mThresholdDecay->mValue : 0.0005f;
-			float value_inverse = 1.0f - entry.mOnsetThreshold;
+			float decay = (entry.mThresholdDecay != nullptr) ? entry.mThresholdDecay->mValue : 0.0001f;
+
+			static const float maximum_decay = 0.95f; // Ensure a decreasing gradient
+			float value_inverse = 1.0f - std::clamp(entry.mOnsetValue, 0.0f, maximum_decay);
 			float decrement = std::abs(value_inverse - value_inverse * std::pow(decay, delta_time));
-			float threshold = std::max(entry.mOnsetThreshold - decrement, 0.0f);
 
-			bool onset = false;
-			if (mElapsedTime >= entry.mLastOnsetDetected + entry.mMinInterval)
-			{
-				float mult = (entry.mMultiplier != nullptr) ? entry.mMultiplier->mValue : 1.0f;
-				float flux = utility::flux(amps, mPreviousBuffer, entry.mMinMaxBins.x, entry.mMinMaxBins.y) * mult;
+			float mult = (entry.mMultiplier != nullptr) ? entry.mMultiplier->mValue : 1.0f;
+			float flux = utility::flux(amps, mPreviousBuffer, entry.mMinMaxBins.x, entry.mMinMaxBins.y) * mult;
 
-				onset = flux > threshold;
-				entry.mLastOnsetDetected = onset ? mElapsedTime : entry.mLastOnsetDetected;
-				entry.mOnsetThreshold = onset ? flux : threshold;
-			}
-			else
-			{
-				entry.mOnsetThreshold = threshold;
-			}
-			entry.mParameter->setValue(entry.mOnsetThreshold * entry.mParameter->mMaximum);
+			entry.mOnsetValue = std::clamp(std::max(flux, entry.mOnsetValue - decrement), 0.0f, 1.0f);
+			float value_smoothed = entry.mOnsetSmoother.update(entry.mOnsetValue, delta_time);
+			entry.mParameter->setValue(value_smoothed * entry.mParameter->mMaximum);
 		}
 
 		// Copy
