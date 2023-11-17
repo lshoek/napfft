@@ -46,6 +46,7 @@ namespace nap
 		void getDependentComponents(std::vector<rtti::TypeInfo>& components) const override;
 
 		std::vector<rtti::ObjectPtr<FilterParameterItem>> mParameters;
+		bool mEnable = true;
 	};
 		
 		

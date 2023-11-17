@@ -19,6 +19,7 @@ RTTI_END_CLASS
 
 RTTI_BEGIN_CLASS(nap::OnsetDetectionComponent)
 	RTTI_PROPERTY("Parameters", &nap::OnsetDetectionComponent::mParameters, nap::rtti::EPropertyMetaData::Default | nap::rtti::EPropertyMetaData::Embedded)
+	RTTI_PROPERTY("Enable", &nap::OnsetDetectionComponent::mEnable, nap::rtti::EPropertyMetaData::Default)
 RTTI_END_CLASS
 
 RTTI_BEGIN_CLASS_NO_DEFAULT_CONSTRUCTOR(nap::OnsetDetectionComponentInstance)
@@ -67,6 +68,9 @@ namespace nap
 
 	void OnsetDetectionComponentInstance::update(double deltaTime)
 	{
+		if (!mResource->mEnable)
+			return;
+
 		const auto& amps = mFFTAudioComponent->getFFTBuffer().getAmplitudeSpectrum();
 		for (const auto& entry : mOnsetList)
 		{
