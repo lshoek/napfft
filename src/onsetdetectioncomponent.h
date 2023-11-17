@@ -10,6 +10,7 @@
 // Nap includes
 #include <component.h>
 #include <parameternumeric.h>
+#include <smoothdamp.h>
 
 namespace nap
 {
@@ -37,6 +38,7 @@ namespace nap
 			rtti::ObjectPtr<ParameterFloat> mThresholdDecay;
 			uint mMinBin = 0;
 			uint mMaxBin = 1;
+			float mSmoothTime = 0.05f;
 		};
 
 		// Constructor
@@ -65,13 +67,15 @@ namespace nap
 		{
 		public:
 			OnsetData(const OnsetDetectionComponent::FilterParameterItem& item) :
-				mParameter(item.mParameter.get()), mMultiplier(item.mMultiplier.get()), mThresholdDecay(item.mThresholdDecay.get()), mMinMaxBins({ item.mMinBin, item.mMaxBin }) {}
+				mParameter(item.mParameter.get()), mMultiplier(item.mMultiplier.get()), mThresholdDecay(item.mThresholdDecay.get()), mMinMaxBins({ item.mMinBin, item.mMaxBin })
+			{}
 
 			ParameterFloat* mParameter = nullptr;
 			ParameterFloat* mMultiplier = nullptr;
 			ParameterFloat* mThresholdDecay = nullptr;
 			glm::uvec2 mMinMaxBins = { 0, 255 };
-			float mOnsetThreshold = 0.0f;
+			float mOnsetValue = 0.0f;
+			math::FloatSmoothOperator mOnsetSmoother{ 0.0f, 0.05f };
 		};
 
 		// Constructor
@@ -99,5 +103,6 @@ namespace nap
 		std::vector<OnsetData> mOnsetList;
 
 		FFTBuffer::AmplitudeSpectrum mPreviousBuffer;
+		float mElapsedTime = 0.0f;
 	};
 }

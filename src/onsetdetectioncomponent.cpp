@@ -15,6 +15,7 @@ RTTI_BEGIN_CLASS(nap::OnsetDetectionComponent::FilterParameterItem)
 	RTTI_PROPERTY("ThresholdDecay", &nap::OnsetDetectionComponent::FilterParameterItem::mThresholdDecay, nap::rtti::EPropertyMetaData::Default)
 	RTTI_PROPERTY("MinimumBin", &nap::OnsetDetectionComponent::FilterParameterItem::mMinBin, nap::rtti::EPropertyMetaData::Default)
 	RTTI_PROPERTY("MaximumBin", &nap::OnsetDetectionComponent::FilterParameterItem::mMaxBin, nap::rtti::EPropertyMetaData::Default)
+	RTTI_PROPERTY("SmoothTime", &nap::OnsetDetectionComponent::FilterParameterItem::mSmoothTime, nap::rtti::EPropertyMetaData::Default)
 RTTI_END_CLASS
 
 RTTI_BEGIN_CLASS(nap::OnsetDetectionComponent)
@@ -71,17 +72,26 @@ namespace nap
 		if (!mResource->mEnable)
 			return;
 
-		const auto& amps = mFFTAudioComponent->getFFTBuffer().getAmplitudeSpectrum();
-		for (const auto& entry : mOnsetList)
-		{
-			float mult = (entry.mMultiplier != nullptr) ? entry.mMultiplier->mValue : 1.0f;
-			float decay = (entry.mThresholdDecay != nullptr) ? entry.mThresholdDecay->mValue : 0.0005f;
-			float value = std::min(entry.mParameter->mValue, 1.0f);
-			float value_inverse = 1.0f - value;
-			float decrement = std::abs(value_inverse - value_inverse * std::pow(decay, static_cast<float>(deltaTime)));
+		const float delta_time = static_cast<float>(deltaTime);
+		mElapsedTime += delta_time;
 
+		// Fetch amplitudes
+		const auto& amps = mFFTAudioComponent->getFFTBuffer().getAmplitudeSpectrum();
+
+		for (auto& entry : mOnsetList)
+		{
+			float decay = (entry.mThresholdDecay != nullptr) ? entry.mThresholdDecay->mValue : 0.0001f;
+
+			static const float maximum_decay = 0.95f; // Ensure a decreasing gradient
+			float value_inverse = 1.0f - std::clamp(entry.mOnsetValue, 0.0f, maximum_decay);
+			float decrement = std::abs(value_inverse - value_inverse * std::pow(decay, delta_time));
+
+			float mult = (entry.mMultiplier != nullptr) ? entry.mMultiplier->mValue : 1.0f;
 			float flux = utility::flux(amps, mPreviousBuffer, entry.mMinMaxBins.x, entry.mMinMaxBins.y) * mult;
-			entry.mParameter->setValue(std::max<float>(value - decrement, flux));
+
+			entry.mOnsetValue = std::clamp(std::max(flux, entry.mOnsetValue - decrement), 0.0f, 1.0f);
+			float value_smoothed = entry.mOnsetSmoother.update(entry.mOnsetValue, delta_time);
+			entry.mParameter->setValue(value_smoothed * entry.mParameter->mMaximum);
 		}
 
 		// Copy
