@@ -67,7 +67,7 @@ namespace nap
 		{
 		public:
 			OnsetData(const OnsetDetectionComponent::FilterParameterItem& item) :
-				mParameter(item.mParameter.get()), mMultiplier(item.mMultiplier.get()), mThresholdDecay(item.mThresholdDecay.get()), mMinMaxBins({ item.mMinBin, item.mMaxBin })
+				mParameter(item.mParameter.get()), mMultiplier(item.mMultiplier.get()), mThresholdDecay(item.mThresholdDecay.get()), mMinMaxBins({ item.mMinBin, item.mMaxBin }), mOnsetSmoother({0.0f, item.mSmoothTime})
 			{}
 
 			ParameterFloat* mParameter = nullptr;
