@@ -4,7 +4,8 @@
     "RequiredModules": [
         "napmath",
         "napscene",
-        "napparameter"
+        "napparameter",
+        "napaudio"
     ],
     "WindowsDllSearchPaths": [
         "{ROOT}/bin/{BUILD_ARCH}",

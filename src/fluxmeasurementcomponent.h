@@ -5,7 +5,7 @@
 #pragma once
 
 // Local includes
-#include "fftaudiocomponent.h"
+#include "fftutils.h"
 
 // Nap includes
 #include <component.h>
@@ -14,15 +14,16 @@
 
 namespace nap
 {
-	class OnsetDetectionComponentInstance;
+	class FluxMeasurementComponentInstance;
+	class FFTAudioNodeComponentInstance;
 			
 	/**
-	 * Component to measure onsets of the audio signal from an @AudioComponentBase.
+	 * Component to measure flux of the audio signal from an @AudioComponentBase.
 	 */
-	class NAPAPI OnsetDetectionComponent : public Component
+	class NAPAPI FluxMeasurementComponent : public Component
 	{
 		RTTI_ENABLE(Component)
-		DECLARE_COMPONENT(OnsetDetectionComponent, OnsetDetectionComponentInstance)	
+		DECLARE_COMPONENT(FluxMeasurementComponent, FluxMeasurementComponentInstance)	
 	public:
 		/**
 		 * FilterParameterItem
@@ -36,13 +37,13 @@ namespace nap
 			rtti::ObjectPtr<ParameterFloat> mParameter;
 			rtti::ObjectPtr<ParameterFloat> mMultiplier;
 			rtti::ObjectPtr<ParameterFloat> mThresholdDecay;
-			uint mMinBin = 0;
-			uint mMaxBin = 1;
+			float mMinHz = 0.0f;
+			float mMaxHz = 44100.0f;
 			float mSmoothTime = 0.05f;
 		};
 
 		// Constructor
-		OnsetDetectionComponent() :
+		FluxMeasurementComponent() :
 			Component() { }
 
 		void getDependentComponents(std::vector<rtti::TypeInfo>& components) const override;
@@ -56,7 +57,7 @@ namespace nap
 	 * Instance of component to measure onsets of the audio signal from an @AudioComponentBase.
 	 * A specific frequency band to be measured can be specified.
 	 */
-	class NAPAPI OnsetDetectionComponentInstance : public ComponentInstance
+	class NAPAPI FluxMeasurementComponentInstance : public ComponentInstance
 	{
 		RTTI_ENABLE(ComponentInstance)
 	public:
@@ -66,20 +67,26 @@ namespace nap
 		class OnsetData
 		{
 		public:
-			OnsetData(const OnsetDetectionComponent::FilterParameterItem& item) :
-				mParameter(item.mParameter.get()), mMultiplier(item.mMultiplier.get()), mThresholdDecay(item.mThresholdDecay.get()), mMinMaxBins({ item.mMinBin, item.mMaxBin }), mOnsetSmoother({0.0f, item.mSmoothTime})
-			{}
+			OnsetData(FluxMeasurementComponent::FilterParameterItem& item) :
+				mParameter(*item.mParameter),
+				mMultiplier(item.mMultiplier.get()),
+				mThresholdDecay(item.mThresholdDecay.get()),
+				mOnsetSmoother({ 0.0f, item.mSmoothTime }),
+				mMinHz(std::clamp(item.mMinHz, 0.0f, 44100.0f)),
+				mMaxHz(std::clamp(item.mMaxHz, 0.0f, 44100.0f))
+			{ }
 
-			ParameterFloat* mParameter = nullptr;
+			ParameterFloat& mParameter;
 			ParameterFloat* mMultiplier = nullptr;
 			ParameterFloat* mThresholdDecay = nullptr;
-			glm::uvec2 mMinMaxBins = { 0, 255 };
+			float mMinHz = 0.0f;
+			float mMaxHz = 44100.0f;
 			float mOnsetValue = 0.0f;
 			math::FloatSmoothOperator mOnsetSmoother{ 0.0f, 0.05f };
 		};
 
 		// Constructor
-		OnsetDetectionComponentInstance(EntityInstance& entity, Component& resource) :
+		FluxMeasurementComponentInstance(EntityInstance& entity, Component& resource) :
 			ComponentInstance(entity, resource) {}
 
 		// Initialize the component
@@ -94,11 +101,11 @@ namespace nap
 		/**
 		 * 
 		 */
-		const std::vector<rtti::ObjectPtr<OnsetDetectionComponent::FilterParameterItem>>& getParameterItems() const { return mResource->mParameters; }
+		const std::vector<rtti::ObjectPtr<FluxMeasurementComponent::FilterParameterItem>>& getParameterItems() const { return mResource->mParameters; }
 
 	private:
-		OnsetDetectionComponent* mResource = nullptr;
-		FFTAudioComponentInstance* mFFTAudioComponent = nullptr;
+		FluxMeasurementComponent* mResource = nullptr;
+		FFTAudioNodeComponentInstance* mFFTAudioComponent = nullptr;
 
 		std::vector<OnsetData> mOnsetList;
 

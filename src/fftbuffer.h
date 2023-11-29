@@ -13,7 +13,7 @@
 namespace nap
 {
 	/**
-	 * FFTBuffer
+	 * Wraps a kiss context
 	 */
 	class NAPAPI FFTBuffer
 	{
